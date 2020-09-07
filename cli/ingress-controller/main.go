@@ -344,15 +344,25 @@ func main() {
 		UpdateCh: updateChannel,
 	}
 
-	var informers []cache.SharedIndexInformer
-	var cacheStores store.CacheStores
+	var preferredIngressAPIs []utils.IngressAPI
+	if cliConfig.AllowIngressNetworkingV1 {
+		preferredIngressAPIs = append(preferredIngressAPIs, utils.NetworkingV1)
+	}
+	if cliConfig.AllowIngressNetworkingV1beta1 {
+		preferredIngressAPIs = append(preferredIngressAPIs, utils.NetworkingV1beta1)
+	}
+	if cliConfig.AllowIngressExtensionsV1beta1 {
+		preferredIngressAPIs = append(preferredIngressAPIs, utils.ExtensionsV1beta1)
+	}
 
-	controllerConfig.IngressAPI, err = utils.NegotiateIngressAPI(kubeClient,
-		[]utils.IngressAPI{utils.NetworkingV1, utils.NetworkingV1beta1, utils.ExtensionsV1beta1})
+	controllerConfig.IngressAPI, err = utils.NegotiateIngressAPI(kubeClient, preferredIngressAPIs)
 	if err != nil {
-		log.Fatalf("NegotiateIngressAPI failed: %v", err)
+		log.Fatalf("NegotiateIngressAPI failed: %v, tried: %+v", err, preferredIngressAPIs)
 	}
 	log.Infof("chosen Ingress API version: %v", controllerConfig.IngressAPI)
+
+	var informers []cache.SharedIndexInformer
+	var cacheStores store.CacheStores
 
 	var ingInformer cache.SharedIndexInformer
 	switch controllerConfig.IngressAPI {
