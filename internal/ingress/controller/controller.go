@@ -32,6 +32,7 @@ import (
 	"github.com/kong/kubernetes-ingress-controller/internal/ingress/status"
 	"github.com/kong/kubernetes-ingress-controller/internal/ingress/store"
 	"github.com/kong/kubernetes-ingress-controller/internal/ingress/task"
+	"github.com/kong/kubernetes-ingress-controller/internal/ingress/utils"
 	configurationv1 "github.com/kong/kubernetes-ingress-controller/pkg/apis/configuration/v1"
 	configClientSet "github.com/kong/kubernetes-ingress-controller/pkg/client/configuration/clientset/versioned"
 	"github.com/mitchellh/mapstructure"
@@ -88,8 +89,9 @@ type Configuration struct {
 	UpdateStatusOnShutdown bool
 	ElectionID             string
 
-	IngressV1beta1UsesNetworking bool
-	EnableKnativeIngressSupport  bool
+	IngressAPI utils.IngressAPI
+
+	EnableKnativeIngressSupport bool
 
 	Logger logrus.FieldLogger
 }
@@ -113,7 +115,7 @@ func (n *KongController) syncIngress(interface{}) error {
 	}
 
 	// Sort ingress rules using the ResourceVersion field
-	ings := n.store.ListIngresses()
+	ings := n.store.ListIngressesV1beta1()
 	sort.SliceStable(ings, func(i, j int) bool {
 		ir := ings[i].ResourceVersion
 		jr := ings[j].ResourceVersion
@@ -182,14 +184,14 @@ func NewKongController(ctx context.Context,
 	if config.UpdateStatus {
 		var err error
 		n.syncStatus, err = status.NewStatusSyncer(ctx, status.Config{
-			CoreClient:                   config.KubeClient,
-			KongConfigClient:             config.KongConfigClient,
-			KnativeClient:                config.KnativeClient,
-			PublishService:               config.PublishService,
-			PublishStatusAddress:         config.PublishStatusAddress,
-			IngressLister:                n.store,
-			UpdateStatusOnShutdown:       config.UpdateStatusOnShutdown,
-			IngressV1beta1UsesNetworking: config.IngressV1beta1UsesNetworking,
+			CoreClient:             config.KubeClient,
+			KongConfigClient:       config.KongConfigClient,
+			KnativeClient:          config.KnativeClient,
+			PublishService:         config.PublishService,
+			PublishStatusAddress:   config.PublishStatusAddress,
+			IngressLister:          n.store,
+			UpdateStatusOnShutdown: config.UpdateStatusOnShutdown,
+			IngressAPI:             config.IngressAPI,
 			OnStartedLeading: func() {
 				// force a sync
 				n.syncQueue.Enqueue(&networking.Ingress{})
